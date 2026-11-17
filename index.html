@@ -140,7 +140,7 @@ body.racing .rctl{display:flex}
 #rDirs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
 #rTest{min-height:40px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:var(--mute);font-size:14px;background:#05080d;border-radius:12px;padding:8px}
 .chip{padding:4px 10px;border-radius:999px;font-size:13px;font-weight:700;color:#071014}
-.chip.gate{background:#4ff0d0}.chip.trap{background:#ff5a4e}.chip.boost{background:#3ddc97}
+.chip.arrow{background:#ffb547}.chip.gate{background:#4ff0d0}.chip.trap{background:#ff5a4e}.chip.boost{background:#3ddc97}
 #rBoard,.rlaps{list-style:none;margin:0;padding:0}
 #rBoard li,.rlaps li{display:grid;grid-template-columns:2em minmax(0,1fr) auto 3em;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #ffffff12;font-size:15px}
 #rBoard li.empty{display:block;color:var(--mute)}
@@ -768,15 +768,39 @@ $('vr').addEventListener('pointerup', () => {
 });
 
 /* ---------- 레이스 모드 (표지판 인식 · 랩 · 함정 · 부스터) ---------- */
-/* 표지판 번호: 0~3 게이트 1~4 · 4~7 함정 · 8~9 부스터 */
-if (window.AR) AR.DICTIONARIES['PCD4'] = { nBits: 16, tau: 3, codeList: [[181,50],[15,154],[51,45],[153,70],[84,158],[121,205],[158,46],[196,242],[254,218],[207,86]] };
-const kindOf = id => id <= 3 ? 'gate' : id <= 7 ? 'trap' : 'boost';
+/* 표지판 번호: 0~3 게이트 1~4 · 4~7 함정 · 8~9 부스터 · 10~11 화살표(오른쪽·왼쪽, 꾸미기용) */
+if (window.AR) AR.DICTIONARIES['PCD4'] = { nBits: 16, tau: 3, codeList: [[181,50],[15,154],[51,45],[153,70],[84,158],[121,205],[158,46],[196,242],[254,218],[207,86],[249,145],[17,167]] };
+const kindOf = id => id <= 3 ? 'gate' : id <= 7 ? 'trap' : id <= 9 ? 'boost' : 'arrow';
+/* 화살표 표지판 모양 (인쇄물 기준 mm, 표지판 무늬 검은 사각형 = 50mm) */
+const SIGN = (() => {
+  const mk = (bx, right) => {
+    const r = (x, y) => [(x - bx)/50, (y - 22.5)/50];
+    const chev = [];
+    for (let k = 0; k < 5; k++) {
+      const top = 17, bot = 78, mid = 47.5, t = 12, tip = 22;
+      if (right) { const x = 100 + k*34; chev.push([[x,top],[x+t,top],[x+t+tip,mid],[x+t,bot],[x,bot],[x+tip,mid]].map(p => r(...p))); }
+      else { const x2 = 15 + k*34 + t + tip; chev.push([[x2,top],[x2-t,top],[x2-t-tip,mid],[x2-t,bot],[x2,bot],[x2-tip,mid]].map(p => r(...p))); }
+    }
+    if (!right) chev.reverse();                                  // 불빛이 화살표 방향으로 흐르도록
+    return {face: [[0,0],[287,0],[287,95],[0,95]].map(p => r(...p)), chev};
+  };
+  return {10: mk(22.5, true), 11: mk(214.5, false)};
+})();
+/* 표지판 무늬 네 꼭짓점 → 원근 변환 (단위 사각형 → 화면) */
+function homog(q){
+  const [x0,y0] = q[0], [x1,y1] = q[1], [x2,y2] = q[2], [x3,y3] = q[3];
+  const dx1 = x1-x2, dx2 = x3-x2, dx3 = x0-x1+x2-x3, dy1 = y1-y2, dy2 = y3-y2, dy3 = y0-y1+y2-y3;
+  const den = dx1*dy2 - dx2*dy1 || 1e-9;
+  const g = (dx3*dy2 - dx2*dy3)/den, h = (dx1*dy3 - dx3*dy1)/den;
+  const a = x1-x0+g*x1, b = x3-x0+h*x3, d = y1-y0+g*y1, e = y3-y0+h*y3;
+  return (u, v) => { const w = g*u + h*v + 1; return [(a*u + b*v + x0)/w, (d*u + e*v + y0)/w]; };
+}
 const DIRS = {L:['←','왼쪽'], S:['↑','직진'], R:['→','오른쪽'], U:['↩','유턴']};
 const SENS = {near:{y:.72, s:.16, label:'가까이'}, mid:{y:.6, s:.11, label:'보통'}, far:{y:.48, s:.07, label:'멀리'}};
 const R = {
   cfg: Object.assign({laps:3, gates:4, dirs:['L','L','L','L'], sens:'mid', sound:true},
     (() => { try { return JSON.parse(localStorage.getItem('pcd-race') || '{}'); } catch(e) { return {}; } })()),
-  state:'idle', t0:0, pen:0, lap:0, next:1, lapT:0, laps:[], vis:[], hits:{}, cool:{}, splats:[], wipeT:0, msg:null, frame:null, total:0
+  state:'idle', signT:{}, t0:0, pen:0, lap:0, next:1, lapT:0, laps:[], vis:[], hits:{}, cool:{}, splats:[], wipeT:0, msg:null, frame:null, total:0
 };
 const saveCfg = () => { try { localStorage.setItem('pcd-race', JSON.stringify(R.cfg)); } catch(e) {} };
 let detector = null;
@@ -812,8 +836,10 @@ function toast(text, cls, ms = 1800){ R.msg = {text, cls, until: performance.now
 /* 프레임에서 표지판 찾기 */
 function detectTick(){
   const v = $('vVid'), live = $('ws').classList.contains('on') && v.videoWidth;
-  const want = R.state !== 'idle' || !$('rSheet').classList.contains('hide');
-  if (!detector || !live || !want) { R.vis = []; return; }
+  const busy = R.state !== 'idle' || !$('rSheet').classList.contains('hide');
+  if (!detector || !live) { R.vis = []; return; }
+  if (!busy && performance.now() - (R.lastDet || 0) < 240) return;          // 레이스가 아닐 땐 천천히 (화살표 빛내기용)
+  R.lastDet = performance.now();
   const side = rot % 180 !== 0, rw = side ? v.videoHeight : v.videoWidth, rh = side ? v.videoWidth : v.videoHeight;
   const k = 640 / Math.max(rw, rh), fw = Math.round(rw*k), fh = Math.round(rh*k);
   if (detC.width !== fw || detC.height !== fh) { detC.width = fw; detC.height = fh; }
@@ -823,7 +849,8 @@ function detectTick(){
   try { ms = detector.detect(detG.getImageData(0, 0, fw, fh)); } catch(e) { ms = []; }
   const now = performance.now(), big = Math.max(fw, fh);
   R.frame = {fw, fh};
-  R.vis = ms.filter(m => m.id >= 0 && m.id <= 9).map(m => {
+  for (const id of [10, 11]) if (!ms.some(m => m.id === id)) delete R.signT[id]; else if (!R.signT[id]) R.signT[id] = now;
+  R.vis = ms.filter(m => m.id >= 0 && m.id <= 11).map(m => {
     const xs = m.corners.map(c => c.x), ys = m.corners.map(c => c.y);
     let sz = 0; for (let i = 0; i < 4; i++) { const a = m.corners[i], b = m.corners[(i+1)%4]; sz = Math.max(sz, Math.hypot(a.x-b.x, a.y-b.y)); }
     return {id: m.id, corners: m.corners, cx: xs.reduce((a,b)=>a+b)/4/fw, cy: ys.reduce((a,b)=>a+b)/4/fh, size: sz/big, t: now};
@@ -836,6 +863,7 @@ function detectTick(){
     R.hits[m.id] = close ? (R.hits[m.id] || 0) + 1 : 0;              // 연속 2번 보여야 인정
     if (R.hits[m.id] < 2 || (R.cool[m.id] || 0) > now) continue;
     const kind = kindOf(m.id);
+    if (kind === 'arrow') continue;
     if (kind === 'gate') passGate(m.id + 1);
     if (kind === 'trap') { R.cool[m.id] = now + 4000; hitTrap(); }
     if (kind === 'boost') { R.cool[m.id] = now + 5000; R.pen -= 1000; snd('boost'); toast('부스터! −1초', 'good'); flash('#3ddc97'); }
@@ -946,7 +974,7 @@ $('rCancel').onclick = () => $('rSheet').classList.add('hide');
 $('rReset').onclick = () => { try { localStorage.removeItem('pcd-board'); } catch(e) {} renderBoard(); };
 $('rWipe').onclick = wipe;
 $('rStop').onclick = () => { stopRace(); toast('레이스를 멈췄어요'); };
-const NAMES = id => kindOf(id) === 'gate' ? `게이트 ${id+1}` : kindOf(id) === 'trap' ? `함정 ${'ABCD'[id-4]}` : `부스터 ${'AB'[id-8]}`;
+const NAMES = id => ({gate: `게이트 ${id+1}`, trap: `함정 ${'ABCD'[id-4]}`, boost: `부스터 ${'AB'[id-8]}`, arrow: id === 10 ? '화살표 →' : '화살표 ←'})[kindOf(id)];
 function updateTest(){
   if ($('rSheet').classList.contains('hide')) return;
   const live = $('ws').classList.contains('on');
@@ -966,6 +994,7 @@ function drawAR(g, map, unit){
   for (const m of R.vis) {
     if (now - m.t > 400) continue;
     const kind = kindOf(m.id), pts = m.corners.map(c => map(c.x, c.y));
+    if (kind === 'arrow') { drawSign(g, m, pts, unit, now); continue; }
     const isNext = kind === 'gate' && m.id + 1 === R.next && R.state === 'racing';
     const col = kind === 'trap' ? '#ff5a4e' : kind === 'boost' ? '#3ddc97' : isNext ? '#4ff0d0' : '#c9d3df';
     g.save(); g.lineJoin = 'round'; g.strokeStyle = col; g.lineWidth = unit * (isNext ? 4 : 3);
@@ -979,6 +1008,21 @@ function drawAR(g, map, unit){
     g.fillStyle = '#071014'; g.textAlign = 'center'; g.fillText(label, top[0], top[1] - unit*12.5);
     g.restore();
   }
+}
+function drawSign(g, m, pts, unit, now){
+  const H = homog(pts), sg = SIGN[m.id], seen = (m.first = m.first || now);
+  const A = t => (t - .5) / 1.11 + .5;                                 // 인식 꼭짓점이 무늬보다 약 11% 바깥에 잡힘
+  const poly = (ps) => { g.beginPath(); ps.forEach((p, i) => { const q = H(A(p[0]), A(p[1])); i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]); }); g.closePath(); };
+  const on = Math.min(1, (now - (R.signT[m.id] || now)) / 250);       // 처음 보이면 0.25초 동안 켜짐
+  g.save(); g.lineJoin = 'round';
+  poly(sg.face); g.fillStyle = `rgba(255,181,71,${.16*on})`; g.fill();
+  g.shadowColor = '#ffb547'; g.shadowBlur = unit*22*on; g.strokeStyle = `rgba(255,200,90,${.95*on})`; g.lineWidth = unit*4; g.stroke();
+  sg.chev.forEach((c, k) => {
+    const ph = ((now/90 - k*2.2) % 11 + 11) % 11, lit = Math.max(.35, 1 - Math.abs(ph - 1.5)/2.2);
+    poly(c); g.shadowBlur = unit*26*lit*on; g.shadowColor = '#ffd36b';
+    g.fillStyle = `rgba(255,${190 + 50*lit|0},${70 + 120*lit|0},${(.25 + .7*lit)*on})`; g.fill();
+  });
+  g.restore();
 }
 function drawMud(g, x0, y0, W, H){
   const now = performance.now(), wiping = R.wipeT && now - R.wipeT < 500;
