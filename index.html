@@ -554,8 +554,18 @@ function initGl(c){
   } catch(e) { gl = null; return false; }
 }
 
+function useCanvas2d(){                                                            // WebGL이 안 되면 일반 그리기로 전환
+  gl = null; const old = $('vrC'), nc = old.cloneNode(); old.replaceWith(nc); vrNoGl = true;
+}
+let vrNoGl = false;
 function vrLoop(){
   if (!vrOn) return;
+  try { vrFrame(); }
+  catch(e) { if (gl) useCanvas2d(); else { console.error(e); } }
+  requestAnimationFrame(vrLoop);
+}
+function vrFrame(){
+  if (gl && gl.isContextLost()) useCanvas2d();
   updateHead();
   const c = $('vrC'), dpr = Math.min(devicePixelRatio || 1, 2), W = Math.round(c.clientWidth*dpr), H = Math.round(c.clientHeight*dpr);
   if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
@@ -578,20 +588,22 @@ function vrLoop(){
     const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
     for (const [eye, l] of [[0,l0],[1,l1]]) g.drawImage(stereo, eye*S, 0, S, S, l[0]-R, l[1]-R, R*2, R*2);
   }
-  requestAnimationFrame(vrLoop);
 }
 
-async function enterVr(){
+function enterVr(){
   vrOn = true; base = null; $('vr').classList.remove('hide');
-  if (!gl) {                                                                         // 처음 한 번만 캔버스 준비
+  if (!gl && !vrNoGl) {                                                              // 처음 한 번만 캔버스 준비
     const old = $('vrC'), nc = old.cloneNode(); old.replaceWith(nc);
     if (!initGl(nc)) { const n2 = nc.cloneNode(); nc.replaceWith(n2); }
   }
   showHint(5000);
-  try { await document.documentElement.requestFullscreen(); } catch(e) {}
-  try { await screen.orientation.lock('landscape'); } catch(e) {}
-  try { if ('wakeLock' in navigator) vrLock = await navigator.wakeLock.request('screen'); } catch(e) {}
-  requestAnimationFrame(vrLoop);
+  requestAnimationFrame(vrLoop);                                                     // 그리기를 먼저 시작
+  // 전체 화면·가로 고정·화면 꺼짐 방지는 기다리지 않음 (기기에 따라 응답이 없을 수 있음)
+  try {
+    const fs = document.documentElement.requestFullscreen ? document.documentElement.requestFullscreen() : null;
+    Promise.resolve(fs).then(() => screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape')).catch(() => {});
+  } catch(e) {}
+  try { if ('wakeLock' in navigator) navigator.wakeLock.request('screen').then(l => { vrLock = l; }).catch(() => {}); } catch(e) {}
 }
 async function exitVr(){
   vrOn = false; $('vr').classList.add('hide');
