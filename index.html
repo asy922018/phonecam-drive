@@ -8,6 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;700;800&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-aruco2@2.0.0/src/cv.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-aruco2@2.0.0/src/aruco.js"></script>
 <style>
 /*
 VOICE: 밤 드라이브, 차분하고 몰입감 있게
@@ -99,6 +101,57 @@ body.v #scene{bottom:38%}
 .tile:hover,.tile:focus-visible{outline:2px solid var(--hud);outline-offset:-2px}
 .tile.act{background:linear-gradient(#11433e,#0b2a28)}
 #snapLink{display:none}
+/* 레이스 */
+.fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+#rFlash{position:absolute;inset:0;opacity:0;pointer-events:none;z-index:3}
+#rFlash.on{animation:fl .5s ease-out}
+@keyframes fl{0%{opacity:.45}100%{opacity:0}}
+.ws.shake{animation:sh .45s}
+@keyframes sh{20%{transform:translate(-10px,4px)}40%{transform:translate(9px,-5px)}60%{transform:translate(-6px,3px)}80%{transform:translate(4px,-2px)}}
+@media (prefers-reduced-motion:reduce){.ws.shake{animation:none}}
+.rhud{position:absolute;z-index:4;left:7%;top:7%;display:none;gap:8px}
+.rbox{background:#05080dcc;border:1px solid #ffffff22;border-radius:12px;padding:6px 12px;line-height:1.1}
+.rbox small{display:block;color:var(--mute);font-size:12px}
+.rbox b{font-size:clamp(20px,2.6vw,30px)}
+.rbox em{font-style:normal;color:var(--amber);font-size:14px;margin-left:6px}
+.rdirhud{position:absolute;z-index:4;top:11%;left:50%;transform:translateX(-50%);display:none;text-align:center;color:var(--hud);text-shadow:0 0 16px #4ff0d088,0 2px 4px #000}
+.rdirhud div:first-child{font-size:clamp(40px,7vw,80px);font-weight:800;line-height:1}
+.rdirhud div:last-child{font-weight:800;font-size:clamp(14px,1.7vw,19px);background:#05080daa;border-radius:999px;padding:3px 12px;margin-top:4px;white-space:nowrap}
+.rdirhud.pop div:first-child{animation:pop .5s}
+@keyframes pop{0%{transform:scale(1.6)}100%{transform:scale(1)}}
+.rcount{position:absolute;z-index:5;left:50%;top:32%;transform:translate(-50%,-50%) scale(.6);font:800 clamp(70px,14vw,160px)/1 Orbitron,"Gothic A1",sans-serif;color:var(--amber);text-shadow:0 0 30px #ffb54799,0 4px 8px #000;opacity:0;pointer-events:none;transition:transform .25s,opacity .25s;white-space:nowrap}
+.rcount.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.rtoast{position:absolute;z-index:5;left:50%;top:25%;transform:translate(-50%,-10px);padding:10px 20px;border-radius:999px;font-weight:800;font-size:clamp(16px,2vw,22px);color:#fff;background:#0b3d36ee;opacity:0;pointer-events:none;transition:.25s;white-space:nowrap}
+.rtoast.show{opacity:1;transform:translate(-50%,0)}
+.rtoast.bad{background:#7a1f1aee}.rtoast.warn{background:#6b4a0aee}
+.rctl{position:absolute;z-index:5;left:50%;bottom:38%;transform:translateX(-50%);display:none;gap:10px}
+.rctl button{min-height:48px;padding:10px 22px;border-radius:999px;border:1px solid #ffffff33;background:#05080dcc;color:#fff;font-weight:800;cursor:pointer;white-space:nowrap}
+#rWipe.dirty{background:#ffb547;color:#241500;border-color:#ffb547;animation:pulse 1s infinite}
+@keyframes pulse{50%{transform:scale(1.06)}}
+body.racing .rhud{display:flex}
+body.racing .rdirhud{display:block}
+body.racing .rctl{display:flex}
+.tile.race{background:linear-gradient(#11433e,#0b2a28)}
+.sheet.wide{width:min(100%,560px);max-height:calc(100dvh - 32px);overflow:auto}
+.sheet h3{margin:14px 0 6px;font-size:16px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
+.rgrid label,.rdir{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--mute)}
+.rgrid select,.rdir select{width:100%}
+#rDirs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 14px}
+#rTest{min-height:40px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:var(--mute);font-size:14px;background:#05080d;border-radius:12px;padding:8px}
+.chip{padding:4px 10px;border-radius:999px;font-size:13px;font-weight:700;color:#071014}
+.chip.gate{background:#4ff0d0}.chip.trap{background:#ff5a4e}.chip.boost{background:#3ddc97}
+#rBoard,.rlaps{list-style:none;margin:0;padding:0}
+#rBoard li,.rlaps li{display:grid;grid-template-columns:2em minmax(0,1fr) auto 3em;gap:8px;align-items:center;padding:6px 4px;border-bottom:1px solid #ffffff12;font-size:15px}
+#rBoard li.empty{display:block;color:var(--mute)}
+#rBoard small{color:var(--mute);text-align:right}
+.rlaps li{grid-template-columns:3em minmax(0,1fr) auto}
+.rlaps em{font-style:normal;color:var(--hud);font-size:13px}
+.rbig{font-size:clamp(40px,8vw,64px);font-weight:800;color:var(--amber);line-height:1.1}
+.rsub{color:var(--mute);margin:4px 0 10px}
+.rwarn{background:#3a1410;color:#ffb3a8;border-radius:10px;padding:8px 12px;font-size:14px;margin-bottom:8px}
+a.rlink{color:var(--hud)}
+.ovl{position:fixed;inset:0;z-index:60;background:#05070cd9;display:grid;place-items:center;padding:16px}
 @media (orientation:portrait){
   .ws{height:50%}
   .cluster{left:4%;width:46%;height:20%;bottom:13%}
@@ -171,6 +224,8 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:15px}
   <div class="ws" id="ws">
     <video id="vBlur" playsinline autoplay muted aria-hidden="true"></video>
     <video id="vVid" playsinline autoplay muted></video>
+    <canvas class="fx" id="fx"></canvas>
+    <div id="rFlash"></div>
   </div>
 
   <div class="hud" id="hud">
@@ -196,6 +251,12 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:15px}
 
   <div class="mirror"><i class="dot" id="vDot"></i><span id="vStat">준비 중…</span></div>
 
+  <div class="rhud"><div class="rbox"><small>LAP</small><b class="num" id="rLap">1/3</b></div><div class="rbox"><small>기록</small><b class="num" id="rTime">0:00.00</b><em id="rPen"></em></div></div>
+  <div class="rdirhud" id="rDir"><div id="rArrow">↑</div><div id="rNext"></div></div>
+  <div class="rcount" id="rCount"></div>
+  <div class="rtoast" id="rToast"></div>
+  <div class="rctl"><button id="rWipe">와이퍼</button><button id="rStop">레이스 중단</button></div>
+
   <div class="cluster">
     <div class="clock num" id="clock">--:--</div>
     <div class="gauge" id="gSpeed"></div>
@@ -220,16 +281,47 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:15px}
       <button class="tile" id="vMir"><svg viewBox="0 0 24 24"><path d="M12 3v18M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg>좌우 반전</button>
       <button class="tile" id="vSound"><svg viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l4 6M21 9l-4 6" id="muteX"/></svg><span id="sndTxt">소리 켜기</span></button>
       <button class="tile" id="vSnap"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l2-3h4l2 3"/></svg>캡처</button>
-      <button class="tile wide" id="vVr"><svg viewBox="0 0 24 24"><path d="M3 8h18v9h-6l-2-3h-2l-2 3H3z"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/></svg>VR 모드</button>
+      <button class="tile" id="vVr"><svg viewBox="0 0 24 24"><path d="M3 8h18v9h-6l-2-3h-2l-2 3H3z"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/></svg>VR 모드</button>
+      <button class="tile race" id="vRace"><svg viewBox="0 0 24 24"><path d="M5 21V4h11l-2 4 2 4H5"/></svg>레이스</button>
     </div>
   </div>
   <a id="snapLink" download="capture.png">캡처 저장</a>
 </section>
 
+<!-- 레이스 설정 -->
+<div id="rSheet" class="ovl hide">
+  <div class="sheet wide">
+    <h2>레이스</h2>
+    <div class="rwarn hide" id="rWarn">표지판 인식 기능을 불러오지 못했어요. 인터넷 연결을 확인하고 새로고침해 주세요.</div>
+    <p>바닥에 표지판을 깔고 자동차가 그 위를 지나가면 인식해요. 게이트 1이 출발선이에요. <a class="rlink" href="markers.pdf" target="_blank" rel="noopener">표지판 인쇄하기 (PDF)</a></p>
+    <div class="rgrid">
+      <label>랩 수<select id="rLaps"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+      <label>게이트 수<select id="rGates"><option>2</option><option>3</option><option>4</option></select></label>
+      <label>인식 거리<select id="rSens"><option value="near">가까이 (확실할 때만)</option><option value="mid">보통</option><option value="far">멀리 (빨리 반응)</option></select></label>
+    </div>
+    <h3>게이트를 지난 뒤 방향</h3>
+    <div id="rDirs"></div>
+    <h3>표지판 테스트</h3>
+    <div id="rTest"></div>
+    <label class="chk" style="margin-top:10px"><input type="checkbox" id="rSound"> 효과음</label>
+    <h3>기록판</h3>
+    <ol id="rBoard"></ol>
+    <div class="row2"><button class="btn" id="rReset">기록 지우기</button><button class="btn" id="rCancel">닫기</button><button class="btn pri" id="rGo">레이스 시작</button></div>
+  </div>
+</div>
+<div id="rRes" class="ovl hide" style="z-index:61">
+  <div class="sheet">
+    <h2>결승!</h2>
+    <div id="rResBody"></div>
+    <label class="sl" style="grid-template-columns:3em minmax(0,1fr)">이름<input id="rName" maxlength="12" style="min-height:44px;border-radius:10px;border:1px solid #2d3a4b;background:#05080d;color:var(--ink);padding:0 10px;font-size:16px" placeholder="모둠 또는 이름"></label>
+    <div class="row2"><button class="btn" id="rClose2">닫기</button><button class="btn" id="rAgain">다시 달리기</button><button class="btn pri" id="rSave">기록 저장</button></div>
+  </div>
+</div>
+
 <!-- VR (카드보드) -->
 <div id="vr" class="hide">
   <canvas id="vrC"></canvas>
-  <div id="vrHint">한 번 탭: 정면 맞추기 · 두 번 탭: 나가기</div>
+  <div id="vrHint">탭: 정면 맞추기(레이스 중엔 와이퍼) · 길게 누르기: 정면 · 두 번 탭: 나가기</div>
 </div>
 <div id="vrSheet" class="hide">
   <div class="sheet">
@@ -416,6 +508,7 @@ $('vSnap').onclick = () => {
 };
 
 /* ---------- VR 모드 (렌즈 보정 · 머리 추적 · 입체감) ---------- */
+let vrGeo = null;
 const vrSet = Object.assign({k:55, ipd:63, depth:55, cam:110, track:true},
   (() => { try { const o = JSON.parse(localStorage.getItem('pcd-vr') || '{}'); delete o.cam; return Object.assign(o, JSON.parse(localStorage.getItem('pcd-vr2') || '{}')); } catch(e) { return {}; } })());
 const EYE_FOV = 90;                                     // 한쪽 눈이 보는 화각(도)
@@ -499,6 +592,7 @@ function drawScene(g, S, eye){
     const w = X(vrSet.cam), h = w * vh / vw, cy = Y((WT + WB) / 2 + 2);
     g.save(); g.translate(0, cy); g.rotate(rot*Math.PI/180); g.scale(mir?-1:1, 1);
     const rw = side ? h : w, rh = side ? w : h; g.drawImage(v, -rw/2, -rh/2, rw, rh); g.restore();
+    vrGeo = {w, h, cy};
     const vg = g.createRadialGradient(0, cy, w*.42, 0, cy, w*.62); vg.addColorStop(0, '#0000'); vg.addColorStop(1, '#0006');
     g.fillStyle = vg; g.fillRect(...SKY);
   } else {
@@ -512,6 +606,7 @@ function drawScene(g, S, eye){
   }
   const glare = g.createLinearGradient(X(-60), Y(30), X(30), Y(-10)); glare.addColorStop(0, '#ffffff10'); glare.addColorStop(.5, '#ffffff00');
   g.fillStyle = glare; g.fillRect(...SKY);
+  try { raceVR(g, X, Y, live ? vrGeo : null); } catch(e) {}
   g.restore();
 
   /* 지붕·필러 */
@@ -521,6 +616,7 @@ function drawScene(g, S, eye){
     g.fillStyle = rg; g.fill('evenodd');
     ws(); g.strokeStyle = '#3a414d'; g.lineWidth = X(.35); g.stroke(); g.restore();
   });
+  layer(2, () => { try { raceHudVR(g, X, Y); } catch(e) {} });
   /* 룸미러 */
   layer(3.6, () => {
     g.fillStyle = '#0b0d11'; g.fillRect(X(-.6), Y(52), X(1.2), X(10));
@@ -657,14 +753,298 @@ async function exitVr(){
   try { vrLock && vrLock.release(); vrLock = null; } catch(e) {}
 }
 let hintT = 0;
-function showHint(ms, txt){ if (txt) $('vrHint').textContent = txt; $('vrHint').style.opacity = 1; clearTimeout(hintT); hintT = setTimeout(() => { $('vrHint').style.opacity = 0; $('vrHint').textContent = '한 번 탭: 정면 맞추기 · 두 번 탭: 나가기'; }, ms); }
-let tapT = 0, lastTap = 0;
+function showHint(ms, txt){ if (txt) $('vrHint').textContent = txt; $('vrHint').style.opacity = 1; clearTimeout(hintT); hintT = setTimeout(() => { $('vrHint').style.opacity = 0; $('vrHint').textContent = '탭: 정면 맞추기(레이스 중엔 와이퍼) · 길게 누르기: 정면 · 두 번 탭: 나가기'; }, ms); }
+let tapT = 0, lastTap = 0, downT = 0;
+$('vr').addEventListener('pointerdown', () => { downT = Date.now(); });
 $('vr').addEventListener('pointerup', () => {
   const t = Date.now();
+  if (t - downT > 600) { recenter(); showHint(1500, '정면을 다시 맞췄어요'); lastTap = 0; return; }
   if (t - lastTap < 350) { clearTimeout(tapT); lastTap = 0; exitVr(); return; }
   lastTap = t;
-  tapT = setTimeout(() => { recenter(); showHint(1500, '정면을 다시 맞췄어요'); }, 360);
+  tapT = setTimeout(() => {
+    if (R.state === 'racing') { wipe(); return; }
+    recenter(); showHint(1500, '정면을 다시 맞췄어요');
+  }, 360);
 });
+
+/* ---------- 레이스 모드 (표지판 인식 · 랩 · 함정 · 부스터) ---------- */
+/* 표지판 번호: 0~3 게이트 1~4 · 4~7 함정 · 8~9 부스터 */
+if (window.AR) AR.DICTIONARIES['PCD4'] = { nBits: 16, tau: 3, codeList: [[181,50],[15,154],[51,45],[153,70],[84,158],[121,205],[158,46],[196,242],[254,218],[207,86]] };
+const kindOf = id => id <= 3 ? 'gate' : id <= 7 ? 'trap' : 'boost';
+const DIRS = {L:['←','왼쪽'], S:['↑','직진'], R:['→','오른쪽'], U:['↩','유턴']};
+const SENS = {near:{y:.72, s:.16, label:'가까이'}, mid:{y:.6, s:.11, label:'보통'}, far:{y:.48, s:.07, label:'멀리'}};
+const R = {
+  cfg: Object.assign({laps:3, gates:4, dirs:['L','L','L','L'], sens:'mid', sound:true},
+    (() => { try { return JSON.parse(localStorage.getItem('pcd-race') || '{}'); } catch(e) { return {}; } })()),
+  state:'idle', t0:0, pen:0, lap:0, next:1, lapT:0, laps:[], vis:[], hits:{}, cool:{}, splats:[], wipeT:0, msg:null, frame:null, total:0
+};
+const saveCfg = () => { try { localStorage.setItem('pcd-race', JSON.stringify(R.cfg)); } catch(e) {} };
+let detector = null;
+try { detector = window.AR ? new AR.Detector({dictionaryName:'PCD4'}) : null; } catch(e) { detector = null; }
+const detC = document.createElement('canvas'), detG = detC.getContext('2d', {willReadFrequently:true});
+
+/* 효과음 */
+let actx = null;
+function snd(type){
+  if (!R.cfg.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime;
+    const tone = (f, a, b, d, w='square') => { const o2 = actx.createOscillator(), g2 = actx.createGain(); o2.type = w; o2.frequency.value = f; g2.gain.setValueAtTime(.0001, t+a); g2.gain.exponentialRampToValueAtTime(.18, t+a+.01); g2.gain.exponentialRampToValueAtTime(.0001, t+a+d); o2.connect(g2); g2.connect(actx.destination); o2.start(t+a); o2.stop(t+a+d+.05); };
+    if (type === 'count') tone(440, 0, 0, .25);
+    if (type === 'go') tone(880, 0, 0, .6);
+    if (type === 'gate') { tone(1046, 0, 0, .12, 'triangle'); tone(1568, .08, 0, .18, 'triangle'); }
+    if (type === 'lap') [523, 659, 784, 1046].forEach((f, i) => tone(f, i*.09, 0, .2, 'triangle'));
+    if (type === 'finish') [523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone(f, i*.12, 0, .28, 'triangle'));
+    if (type === 'boost') { const o3 = actx.createOscillator(), g3 = actx.createGain(); o3.type = 'sawtooth'; o3.frequency.setValueAtTime(300, t); o3.frequency.exponentialRampToValueAtTime(1400, t+.35); g3.gain.setValueAtTime(.12, t); g3.gain.exponentialRampToValueAtTime(.0001, t+.4); o3.connect(g3); g3.connect(actx.destination); o3.start(t); o3.stop(t+.45); }
+    if (type === 'splat') { const n = actx.createBufferSource(), b = actx.createBuffer(1, actx.sampleRate*.35, actx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/d.length, 2); n.buffer = b; const f = actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700; const g4 = actx.createGain(); g4.gain.value = .5; n.connect(f); f.connect(g4); g4.connect(actx.destination); n.start(t); }
+    if (type === 'wrong') tone(220, 0, 0, .25, 'sawtooth');
+  } catch(e) {}
+}
+
+/* 시간 표시 */
+const fmtT = ms => { ms = Math.max(0, ms); const m = Math.floor(ms/60000), s = (ms % 60000)/1000; return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2); };
+const raceNow = () => R.state === 'racing' ? performance.now() - R.t0 : R.state === 'done' ? R.total : 0;
+
+/* 화면 메시지 */
+function toast(text, cls, ms = 1800){ R.msg = {text, cls, until: performance.now() + ms}; const el = $('rToast'); el.textContent = text; el.className = 'rtoast show ' + (cls || ''); clearTimeout(toast.t); toast.t = setTimeout(() => { el.className = 'rtoast'; }, ms); }
+
+/* 프레임에서 표지판 찾기 */
+function detectTick(){
+  const v = $('vVid'), live = $('ws').classList.contains('on') && v.videoWidth;
+  const want = R.state !== 'idle' || !$('rSheet').classList.contains('hide');
+  if (!detector || !live || !want) { R.vis = []; return; }
+  const side = rot % 180 !== 0, rw = side ? v.videoHeight : v.videoWidth, rh = side ? v.videoWidth : v.videoHeight;
+  const k = 640 / Math.max(rw, rh), fw = Math.round(rw*k), fh = Math.round(rh*k);
+  if (detC.width !== fw || detC.height !== fh) { detC.width = fw; detC.height = fh; }
+  detG.save(); detG.translate(fw/2, fh/2); detG.rotate(rot*Math.PI/180);
+  const dw = side ? fh : fw, dh = side ? fw : fh; detG.drawImage(v, -dw/2, -dh/2, dw, dh); detG.restore();
+  let ms = [];
+  try { ms = detector.detect(detG.getImageData(0, 0, fw, fh)); } catch(e) { ms = []; }
+  const now = performance.now(), big = Math.max(fw, fh);
+  R.frame = {fw, fh};
+  R.vis = ms.filter(m => m.id >= 0 && m.id <= 9).map(m => {
+    const xs = m.corners.map(c => c.x), ys = m.corners.map(c => c.y);
+    let sz = 0; for (let i = 0; i < 4; i++) { const a = m.corners[i], b = m.corners[(i+1)%4]; sz = Math.max(sz, Math.hypot(a.x-b.x, a.y-b.y)); }
+    return {id: m.id, corners: m.corners, cx: xs.reduce((a,b)=>a+b)/4/fw, cy: ys.reduce((a,b)=>a+b)/4/fh, size: sz/big, t: now};
+  });
+  updateTest();
+  if (R.state !== 'racing') return;
+  const S = SENS[R.cfg.sens] || SENS.mid;
+  for (const m of R.vis) {
+    const close = m.cy >= S.y && m.size >= S.s;
+    R.hits[m.id] = close ? (R.hits[m.id] || 0) + 1 : 0;              // 연속 2번 보여야 인정
+    if (R.hits[m.id] < 2 || (R.cool[m.id] || 0) > now) continue;
+    const kind = kindOf(m.id);
+    if (kind === 'gate') passGate(m.id + 1);
+    if (kind === 'trap') { R.cool[m.id] = now + 4000; hitTrap(); }
+    if (kind === 'boost') { R.cool[m.id] = now + 5000; R.pen -= 1000; snd('boost'); toast('부스터! −1초', 'good'); flash('#3ddc97'); }
+  }
+}
+setInterval(detectTick, 110);
+
+function passGate(g){
+  const now = performance.now();
+  if (g > R.cfg.gates) return;
+  if (g !== R.next) {
+    R.cool[g-1] = now + 1500;
+    if (g !== ((R.next - 2 + R.cfg.gates) % R.cfg.gates) + 1) { snd('wrong'); toast(`순서가 달라요 · 다음은 ${R.next}번 게이트`, 'warn'); }
+    return;
+  }
+  R.cool[g-1] = now + 2500;
+  if (g === 1) {
+    if (R.lap > 0) {
+      const lt = now - R.lapT; R.laps.push(lt); R.lapT = now;
+      if (R.lap >= R.cfg.laps) { finishRace(); return; }
+      snd('lap'); toast(`${R.lap}랩 완료 · ${fmtT(lt)}`, 'good', 2200);
+    } else { R.lapT = R.t0; snd('gate'); toast('출발선 통과!', 'good'); }
+    R.lap++;
+  } else { snd('gate'); toast(`${g}번 게이트 통과`, 'good', 1200); }
+  R.next = g % R.cfg.gates + 1;
+  showDir(g);
+}
+function showDir(g){
+  const d = DIRS[R.cfg.dirs[g-1]] || DIRS.S;
+  $('rArrow').textContent = d[0]; $('rNext').textContent = `다음 ${R.next}번 게이트 · ${d[1]}`;
+  $('rDir').classList.remove('pop'); void $('rDir').offsetWidth; $('rDir').classList.add('pop');
+}
+function hitTrap(){
+  R.pen += 2000; snd('splat'); toast('함정! 오물 +2초', 'bad'); shake();
+  const n = 3 + Math.floor(Math.random()*3);
+  for (let i = 0; i < n; i++) R.splats.push({x: .15 + Math.random()*.7, y: .12 + Math.random()*.6, r: .07 + Math.random()*.09, born: performance.now(), seed: Math.random()*1000, life: 4200 + Math.random()*1200});
+}
+function flash(col){ const f = $('rFlash'); f.style.background = col; f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+function shake(){ const w = $('ws'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
+function wipe(){
+  if (!R.splats.length) return;
+  R.wipeT = performance.now(); snd('gate');
+  setTimeout(() => { R.splats = []; }, 450);
+}
+
+/* 출발 · 종료 */
+function startRace(){
+  $('rSheet').classList.add('hide');
+  Object.assign(R, {state:'count', pen:0, lap:0, next:1, laps:[], hits:{}, cool:{}, splats:[], total:0});
+  document.body.classList.add('racing'); $('rRes').classList.add('hide');
+  $('rArrow').textContent = '↑'; $('rNext').textContent = '1번 게이트(출발선)로 출발!';
+  try { recenter(); } catch(e) {}
+  let n = 3; const step = () => {
+    if (R.state !== 'count') return;
+    if (n > 0) { $('rCount').textContent = n; $('rCount').className = 'rcount show'; R.countTxt = String(n); snd('count'); n--; setTimeout(step, 1000); }
+    else { $('rCount').textContent = '출발!'; R.countTxt = '출발!'; snd('go'); R.state = 'racing'; R.t0 = performance.now(); setTimeout(() => { $('rCount').className = 'rcount'; R.countTxt = ''; }, 900); }
+  };
+  step();
+}
+function stopRace(){ R.state = 'idle'; R.countTxt = ''; document.body.classList.remove('racing'); $('rCount').className = 'rcount'; }
+function finishRace(){
+  const now = performance.now(); R.state = 'done';
+  R.raw = now - R.t0; R.total = R.raw + R.pen; snd('finish'); toast('결승! ' + fmtT(R.total), 'good', 3000);
+  const best = Math.min(...R.laps);
+  $('rResBody').innerHTML = `<div class="rbig num">${fmtT(R.total)}</div>
+    <div class="rsub">달린 시간 ${fmtT(R.raw)} · 함정·부스터 ${R.pen >= 0 ? '+' : '−'}${(Math.abs(R.pen)/1000).toFixed(1)}초</div>
+    <ol class="rlaps">${R.laps.map((t, i) => `<li><span>${i+1}랩</span><b class="num">${fmtT(t)}</b>${t === best ? '<em>최고</em>' : ''}</li>`).join('')}</ol>`;
+  $('rName').value = R.cfg.name || '';
+  setTimeout(() => { $('rRes').classList.remove('hide'); document.body.classList.remove('racing'); }, 1500);
+}
+const board = () => { try { return JSON.parse(localStorage.getItem('pcd-board') || '[]'); } catch(e) { return []; } };
+function renderBoard(){
+  const b = board();
+  $('rBoard').innerHTML = b.length ? b.map((r, i) => `<li><span class="num">${i+1}</span><b>${r.name.replace(/[<>&]/g, '')}</b><span class="num">${fmtT(r.total)}</span><small>${r.laps}랩</small></li>`).join('')
+    : '<li class="empty">아직 기록이 없어요</li>';
+}
+$('rSave').onclick = () => {
+  const name = ($('rName').value || '이름 없음').trim().slice(0, 12); R.cfg.name = name; saveCfg();
+  const b = board(); b.push({name, total: R.total, laps: R.cfg.laps, date: Date.now()});
+  b.sort((a, c) => a.total - c.total);
+  try { localStorage.setItem('pcd-board', JSON.stringify(b.slice(0, 10))); } catch(e) {}
+  $('rRes').classList.add('hide'); R.state = 'idle'; renderBoard(); openSheet();
+};
+$('rAgain').onclick = () => { $('rRes').classList.add('hide'); R.state = 'idle'; startRace(); };
+$('rClose2').onclick = () => { $('rRes').classList.add('hide'); R.state = 'idle'; };
+
+/* 설정 창 */
+function buildDirs(){
+  $('rDirs').innerHTML = Array.from({length: R.cfg.gates}, (_, i) => {
+    const nx = i + 2 > R.cfg.gates ? 1 : i + 2;
+    return `<label class="rdir"><span>${i+1}번 → ${nx}번</span><select data-i="${i}">${Object.entries(DIRS).map(([k, d]) => `<option value="${k}" ${R.cfg.dirs[i] === k ? 'selected' : ''}>${d[0]} ${d[1]}</option>`).join('')}</select></label>`;
+  }).join('');
+  for (const s of $('rDirs').querySelectorAll('select')) s.onchange = () => { R.cfg.dirs[+s.dataset.i] = s.value; saveCfg(); };
+}
+function openSheet(){
+  $('rLaps').value = R.cfg.laps; $('rGates').value = R.cfg.gates; $('rSens').value = R.cfg.sens; $('rSound').checked = R.cfg.sound;
+  buildDirs(); renderBoard(); updateTest();
+  $('rWarn').classList.toggle('hide', !!detector);
+  $('rSheet').classList.remove('hide');
+}
+$('vRace').onclick = () => { if (R.state === 'racing' || R.state === 'count') { stopRace(); toast('레이스를 멈췄어요'); } openSheet(); };
+$('rLaps').onchange = () => { R.cfg.laps = +$('rLaps').value; saveCfg(); };
+$('rGates').onchange = () => { R.cfg.gates = +$('rGates').value; saveCfg(); buildDirs(); };
+$('rSens').onchange = () => { R.cfg.sens = $('rSens').value; saveCfg(); };
+$('rSound').onchange = () => { R.cfg.sound = $('rSound').checked; saveCfg(); };
+$('rGo').onclick = () => { snd('gate'); startRace(); };
+$('rCancel').onclick = () => $('rSheet').classList.add('hide');
+$('rReset').onclick = () => { try { localStorage.removeItem('pcd-board'); } catch(e) {} renderBoard(); };
+$('rWipe').onclick = wipe;
+$('rStop').onclick = () => { stopRace(); toast('레이스를 멈췄어요'); };
+const NAMES = id => kindOf(id) === 'gate' ? `게이트 ${id+1}` : kindOf(id) === 'trap' ? `함정 ${'ABCD'[id-4]}` : `부스터 ${'AB'[id-8]}`;
+function updateTest(){
+  if ($('rSheet').classList.contains('hide')) return;
+  const live = $('ws').classList.contains('on');
+  $('rTest').innerHTML = !live ? '카메라를 먼저 연결하세요'
+    : R.vis.length ? R.vis.map(m => `<span class="chip ${kindOf(m.id)}">${NAMES(m.id)} · ${Math.round(m.size*100)}%</span>`).join('')
+    : '카메라에 표지판을 비춰 보세요';
+}
+
+/* 앞유리 위 AR 표시와 오물 (태블릿 화면) */
+function toDisp(x, y, W, H){
+  const f = R.frame; if (!f) return [0, 0];
+  const s = fit ? Math.min(W/f.fw, H/f.fh) : Math.max(W/f.fw, H/f.fh);
+  return [W/2 + (x - f.fw/2) * s * (mir ? -1 : 1), H/2 + (y - f.fh/2) * s];
+}
+function drawAR(g, map, unit){
+  const now = performance.now();
+  for (const m of R.vis) {
+    if (now - m.t > 400) continue;
+    const kind = kindOf(m.id), pts = m.corners.map(c => map(c.x, c.y));
+    const isNext = kind === 'gate' && m.id + 1 === R.next && R.state === 'racing';
+    const col = kind === 'trap' ? '#ff5a4e' : kind === 'boost' ? '#3ddc97' : isNext ? '#4ff0d0' : '#c9d3df';
+    g.save(); g.lineJoin = 'round'; g.strokeStyle = col; g.lineWidth = unit * (isNext ? 4 : 3);
+    g.shadowColor = col; g.shadowBlur = unit * 12;
+    g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])); g.closePath(); g.stroke();
+    if (kind === 'trap') { g.globalAlpha = .25 + .15*Math.sin(now/120); g.fillStyle = col; g.fill(); g.globalAlpha = 1; }
+    const top = pts.reduce((a, p) => p[1] < a[1] ? p : a, pts[0]);
+    const label = kind === 'gate' ? (isNext ? `▶ ${m.id+1}번 게이트` : `${m.id+1}번`) : kind === 'trap' ? '⚠ 함정' : '★ 부스터';
+    g.shadowBlur = 0; g.font = `800 ${unit*15}px "Gothic A1", sans-serif`; const tw = g.measureText(label).width;
+    g.fillStyle = col; g.beginPath(); g.roundRect ? g.roundRect(top[0] - tw/2 - unit*8, top[1] - unit*30, tw + unit*16, unit*24, unit*12) : g.rect(top[0] - tw/2 - unit*8, top[1] - unit*30, tw + unit*16, unit*24); g.fill();
+    g.fillStyle = '#071014'; g.textAlign = 'center'; g.fillText(label, top[0], top[1] - unit*12.5);
+    g.restore();
+  }
+}
+function drawMud(g, x0, y0, W, H){
+  const now = performance.now(), wiping = R.wipeT && now - R.wipeT < 500;
+  R.splats = R.splats.filter(s => now - s.born < s.life);
+  for (const s of R.splats) {
+    const age = (now - s.born) / s.life, a = age < .7 ? .92 : .92 * (1 - (age - .7) / .3);
+    const cx = x0 + s.x*W, cy = y0 + s.y*H + age*H*.06, r = s.r * Math.min(W, H*1.6);
+    let rnd = s.seed; const rr = () => (rnd = (rnd * 9301 + 49297) % 233280) / 233280;
+    g.save(); g.globalAlpha = Math.max(0, a);
+    const gr = g.createRadialGradient(cx - r*.2, cy - r*.2, r*.1, cx, cy, r*1.1);
+    gr.addColorStop(0, '#7a5634'); gr.addColorStop(.6, '#53371f'); gr.addColorStop(1, '#3a2614');
+    g.fillStyle = gr; g.beginPath();
+    for (let i = 0; i <= 18; i++) { const an = i/18*Math.PI*2, rad = r*(.75 + rr()*.45); i ? g.lineTo(cx + Math.cos(an)*rad, cy + Math.sin(an)*rad) : g.moveTo(cx + Math.cos(an)*rad, cy + Math.sin(an)*rad); }
+    g.closePath(); g.fill();
+    for (let i = 0; i < 7; i++) { const an = rr()*Math.PI*2, d = r*(1.1 + rr()*.8); g.beginPath(); g.arc(cx + Math.cos(an)*d, cy + Math.sin(an)*d, r*(.08 + rr()*.12), 0, 7); g.fill(); }
+    for (let i = 0; i < 3; i++) { const dx = (rr() - .5)*r*1.2, len = r*(.4 + rr()*.9)*Math.min(1, age*3); g.fillRect(cx + dx - r*.06, cy + r*.5, r*.12, len); g.beginPath(); g.arc(cx + dx, cy + r*.5 + len, r*.09, 0, 7); g.fill(); }
+    g.globalAlpha = Math.max(0, a) * .35; g.fillStyle = '#c9a77a'; g.beginPath(); g.ellipse(cx - r*.3, cy - r*.35, r*.22, r*.1, -.6, 0, 7); g.fill();
+    g.restore();
+  }
+  if (wiping) {
+    const p = (now - R.wipeT) / 500, an = -Math.PI*.9 + p*Math.PI*.8, px = x0 + W*.5, py = y0 + H*1.05;
+    g.save(); g.strokeStyle = '#111'; g.lineWidth = Math.max(4, W*.012); g.lineCap = 'round';
+    g.beginPath(); g.moveTo(px, py); g.lineTo(px + Math.cos(an)*H*1.1, py + Math.sin(an)*H*1.1); g.stroke(); g.restore();
+  }
+}
+function fxLoop(){
+  const c = $('fx'), W = c.clientWidth, H = c.clientHeight, dpr = Math.min(devicePixelRatio || 1, 2);
+  if (c.width !== Math.round(W*dpr) || c.height !== Math.round(H*dpr)) { c.width = Math.round(W*dpr); c.height = Math.round(H*dpr); }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  if (!vrOn) { drawAR(g, (x, y) => toDisp(x, y, W, H), Math.max(.7, Math.min(1.4, W/900))); drawMud(g, 0, 0, W, H); }
+  const t = raceNow(); $('rTime').textContent = fmtT(t);
+  $('rLap').textContent = `${Math.min(Math.max(R.lap, 1), R.cfg.laps)}/${R.cfg.laps}`;
+  $('rPen').textContent = R.pen ? `${R.pen > 0 ? '+' : '−'}${(Math.abs(R.pen)/1000).toFixed(1)}초` : '';
+  $('rWipe').classList.toggle('dirty', R.splats.length > 0);
+  requestAnimationFrame(fxLoop);
+}
+requestAnimationFrame(fxLoop);
+
+/* VR 화면에 레이스 표시 */
+function raceVR(g, X, Y, geo){
+  if (geo) {
+    drawAR(g, (x, y) => { const f = R.frame; return [(x/f.fw - .5) * geo.w * (mir ? -1 : 1), geo.cy + (y/f.fh - .5) * geo.h]; }, X(.09));
+  }
+  drawMud(g, X(-70), Y(38), X(140), X(56));
+}
+function raceHudVR(g, X, Y){
+  const active = R.state === 'racing' || R.state === 'count' || R.state === 'done';
+  if (!active) return;
+  g.save(); g.textAlign = 'left'; g.fillStyle = '#05080dcc';
+  g.beginPath(); g.roundRect ? g.roundRect(X(-36), Y(34), X(24), X(9.5), X(2)) : g.rect(X(-36), Y(34), X(24), X(9.5)); g.fill();
+  g.fillStyle = '#8b98ab'; g.font = `700 ${X(1.5)}px "Gothic A1", sans-serif`; g.fillText('LAP ' + `${Math.min(Math.max(R.lap, 1), R.cfg.laps)}/${R.cfg.laps}`, X(-34.5), Y(31.8));
+  g.fillStyle = '#fff'; g.font = `800 ${X(3.2)}px Orbitron, sans-serif`; g.fillText(fmtT(raceNow()), X(-34.5), Y(27.4));
+  if (R.pen) { g.fillStyle = R.pen > 0 ? '#ffb547' : '#3ddc97'; g.font = `700 ${X(1.5)}px "Gothic A1", sans-serif`; g.fillText(`${R.pen > 0 ? '+' : '−'}${(Math.abs(R.pen)/1000).toFixed(1)}초`, X(-22), Y(31.8)); }
+  if (R.state === 'racing') {
+    g.textAlign = 'center'; g.fillStyle = '#4ff0d0'; g.font = `800 ${X(6)}px "Gothic A1", sans-serif`; g.fillText($('rArrow').textContent, X(22), Y(27));
+    g.font = `700 ${X(1.6)}px "Gothic A1", sans-serif`; g.fillText($('rNext').textContent, X(22), Y(23.5));
+  }
+  if (R.countTxt) { g.textAlign = 'center'; g.fillStyle = '#ffb547'; g.font = `800 ${X(10)}px Orbitron, "Gothic A1", sans-serif`; g.fillText(R.countTxt, 0, Y(8)); }
+  if (R.msg && performance.now() < R.msg.until) {
+    g.textAlign = 'center'; g.font = `800 ${X(2.6)}px "Gothic A1", sans-serif`; const tw = g.measureText(R.msg.text).width;
+    g.fillStyle = R.msg.cls === 'bad' ? '#7a1f1acc' : R.msg.cls === 'warn' ? '#6b4a0acc' : '#0b3d36cc';
+    g.beginPath(); g.roundRect ? g.roundRect(-tw/2 - X(2), Y(17), tw + X(4), X(4.4), X(2.2)) : g.rect(-tw/2 - X(2), Y(17), tw + X(4), X(4.4)); g.fill();
+    g.fillStyle = '#fff'; g.fillText(R.msg.text, 0, Y(13.8));
+  }
+  g.restore();
+}
 
 /* ---------- 카메라(휴대폰) ---------- */
 let facing = 'environment', stream = null, cPeer = null, cCall = null, wake = null;
