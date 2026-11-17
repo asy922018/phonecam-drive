@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/js-aruco2@2.0.0/src/cv.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/js-aruco2@2.0.0/src/aruco.js"></script>
+<script>if (/[?&]demo/.test(location.search)) document.write('<script src="demo.js"><\/script>');</script>
 <style>
 /*
 VOICE: 밤 드라이브, 차분하고 몰입감 있게
@@ -216,6 +217,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:15px}
       </button>
     </div>
     <p class="note">같은 와이파이에서 가장 안정적입니다. 영상은 기기끼리 직접 오가며 서버에 저장되지 않습니다.</p>
+    <p style="margin-top:14px"><a href="?demo" style="color:var(--amber);font-weight:700">▶ 가상 플레이 데모 보기</a></p>
   </div>
 </section>
 
@@ -869,7 +871,7 @@ function detectTick(){
     if (kind === 'boost') { R.cool[m.id] = now + 5000; R.pen -= 1000; snd('boost'); toast('부스터! −1초', 'good'); flash('#3ddc97'); }
   }
 }
-setInterval(detectTick, 110);
+setInterval(detectTick, 70);                                               // 레이스 중 약 0.07초마다 (아닐 땐 0.24초)
 
 function passGate(g){
   const now = performance.now();
