@@ -178,6 +178,7 @@ label.chk{display:flex;gap:6px;align-items:center;font-size:15px}
     <div class="code num" id="vCode">----</div>
     <div class="qr" id="vQr"></div>
     <div class="lbl" style="margin-top:8px">휴대폰 카메라로 QR을 찍으면 바로 연결됩니다</div>
+    <div class="lbl" id="hudMsg" style="margin-top:10px;font-weight:700;color:#fff"></div>
   </div>
 
   <svg class="frame" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
@@ -299,7 +300,21 @@ const setSpeed = v => { curMbps = v; _sp(v); }, setFps = v => { curFps = v; _fp(
 setInterval(() => { const d = new Date(); $('clock').textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()); $('stamp').textContent = d.toLocaleDateString('ko-KR') + ' ' + d.toLocaleTimeString('ko-KR'); }, 1000);
 
 /* ---------- 운전석(태블릿) ---------- */
-let rot = 0, mir = false, curCall = null, lastBytes = 0, lastT = 0, myCode = '';
+let rot = 0, mir = false, curCall = null, lastBytes = 0, lastT = 0, myCode = '', netType = '', hudMsg = '', hudWarn = false;
+function setHudMsg(m, warn){ hudMsg = m; hudWarn = !!warn; const el = $('hudMsg'); if (el) { el.textContent = m; el.style.color = warn ? 'var(--amber)' : ''; } }
+/* 실제 화면(프레임)이 들어올 때만 앞유리에 영상 표시 */
+let lastFrameT = 0;
+setInterval(() => {
+  const v = $('vVid');
+  if (!curCall || !v.srcObject) return;
+  if (v.paused) { v.play().catch(()=>{}); $('vBlur').play().catch(()=>{}); }
+  const st = curCall.peerConnection && curCall.peerConnection.iceConnectionState;
+  const has = v.videoWidth > 0 && v.readyState >= 2 && (st === 'connected' || st === 'completed');
+  if (has && !$('ws').classList.contains('on')) {
+    $('ws').classList.add('on'); $('hud').classList.add('hide'); layout();
+    setStat('vDot','vStat','live','LIVE · 실시간 수신 중' + (netType ? ' · ' + netType : ''));
+  }
+}, 500);
 function startView(){
   show('view');
   const code = String(Math.floor(1000 + Math.random()*9000));
@@ -311,22 +326,32 @@ function startView(){
     try { const q = qrcode(0,'M'); q.addData(url); q.make(); $('vQr').innerHTML = q.createImgTag(5,0); } catch(e) { $('vQr').classList.add('hide'); }
   });
   peer.on('call', call => {
-    curCall = call; lastBytes = 0; lastT = 0;
+    if (curCall && curCall !== call) { try { curCall.close(); } catch(e) {} }
+    curCall = call; lastBytes = 0; lastT = 0; netType = '';
     call.answer();
+    setHudMsg('카메라 휴대폰을 찾았어요 · 연결하는 중…');
+    setStat('vDot','vStat','','연결하는 중…');
     call.on('stream', s => {
       $('vVid').srcObject = s; $('vBlur').srcObject = s; $('vVid').play().catch(()=>{}); $('vBlur').play().catch(()=>{});
-      $('ws').classList.add('on'); $('hud').classList.add('hide'); layout();
-      setStat('vDot','vStat','live','LIVE · 실시간 수신 중');
+      setHudMsg('영상 신호를 받았어요 · 화면을 기다리는 중…');
     });
-    const end = () => {
+    const end = (msg) => {
       if (curCall !== call) return;
       $('ws').classList.remove('on'); $('hud').classList.remove('hide');
-      setStat('vDot','vStat','','연결 끊김 · 다시 기다리는 중'); setSpeed(0); setFps(0);
+      setStat('vDot','vStat', msg ? 'err' : '', msg ? '연결 실패' : '연결 끊김 · 다시 기다리는 중'); setSpeed(0); setFps(0);
+      setHudMsg(msg || '연결이 끊겼어요 · 카메라 휴대폰에서 다시 연결을 누르세요', !!msg);
     };
-    call.on('close', end); call.on('error', end);
-    call.peerConnection && call.peerConnection.addEventListener('connectionstatechange', () => {
-      const st = call.peerConnection.connectionState; if (st === 'failed' || st === 'disconnected') end();
-    });
+    call.on('close', () => end()); call.on('error', () => end());
+    const pc = call.peerConnection;
+    if (pc) {
+      pc.addEventListener('iceconnectionstatechange', () => {
+        const st = pc.iceConnectionState;
+        if (st === 'checking') setHudMsg('두 휴대폰을 직접 연결하는 중…');
+        if (st === 'connected' || st === 'completed') setHudMsg('연결됐어요 · 첫 화면을 기다리는 중…');
+        if (st === 'failed') end('두 기기가 직접 연결되지 않아요. 두 휴대폰을 같은 와이파이에 연결하고 다시 시도하세요. (한쪽이 LTE/5G면 연결되지 않을 수 있어요)');
+      });
+      pc.addEventListener('connectionstatechange', () => { if (pc.connectionState === 'failed') end('연결에 실패했어요. 두 휴대폰을 같은 와이파이에 연결하고 다시 시도하세요.'); });
+    }
   });
   peer.on('disconnected', () => peer.reconnect());
   peer.on('error', e => {
@@ -334,10 +359,15 @@ function startView(){
     setStat('vDot','vStat','err','오류: ' + e.type);
   });
   setInterval(async () => {
-    if (!curCall || !curCall.peerConnection || !$('ws').classList.contains('on')) return;
+    if (!curCall || !curCall.peerConnection) return;
     try {
       const stats = await curCall.peerConnection.getStats();
       stats.forEach(r => {
+        if (r.type === 'candidate-pair' && (r.nominated || r.selected) && r.state === 'succeeded') {
+          const lc = stats.get(r.localCandidateId), rc = stats.get(r.remoteCandidateId), t = [lc && lc.candidateType, rc && rc.candidateType];
+          const nt = t.includes('relay') ? '중계 연결' : (t[0] === 'host' && t[1] === 'host') ? '같은 와이파이' : '인터넷 직접 연결';
+          if (nt !== netType) { netType = nt; setStat('vDot','vStat','live','LIVE · 실시간 수신 중 · ' + nt); }
+        }
         if (r.type === 'inbound-rtp' && r.kind === 'video') {
           if (lastT) setSpeed((r.bytesReceived - lastBytes) * 8 / ((r.timestamp - lastT) / 1000) / 1e6);
           lastBytes = r.bytesReceived; lastT = r.timestamp;
@@ -475,7 +505,8 @@ function drawScene(g, S, eye){
     g.fillStyle = '#4ff0d0'; g.font = `800 ${X(8)}px Orbitron, sans-serif`;
     g.fillText(myCode ? myCode.split('').join(' ') : '- - - -', 0, Y(5));
     g.fillStyle = '#8b98ab'; g.font = `${X(1.8)}px "Gothic A1", sans-serif`;
-    g.fillText('연결되면 바깥 풍경이 자동으로 나타납니다', 0, Y(0));
+    g.fillStyle = hudWarn ? '#ffb547' : '#8b98ab';
+    g.fillText(hudWarn ? '연결 실패 · 두 휴대폰을 같은 와이파이에 연결하세요' : (hudMsg || '연결되면 바깥 풍경이 자동으로 나타납니다'), 0, Y(0));
   }
   const glare = g.createLinearGradient(X(-60), Y(30), X(30), Y(-10)); glare.addColorStop(0, '#ffffff10'); glare.addColorStop(.5, '#ffffff00');
   g.fillStyle = glare; g.fillRect(X(-70), Y(36), X(140), X(50));
